@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Finger · Tindeq Progressor</title>
+    <link rel="stylesheet" href="style.css" />
+    <script>
+      // Set before first paint: the saved choice, else the system setting.
+      (function () {
+        var saved = null;
+        try {
+          saved = localStorage.getItem('theme');
+        } catch (e) {}
+        var dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      })();
+    </script>
+    <script type="module" src="src/app.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Finger</h1>
+          <p class="meta"><span id="status"></span> <span id="device"></span></p>
+        </div>
+        <div class="actions">
+          <button id="theme" class="ghost"></button>
+          <button id="demo" class="ghost">Demo</button>
+          <button id="connect">Connect</button>
+        </div>
+      </header>
+
+      <nav role="tablist">
+        <button role="tab" data-view="measure-view" aria-selected="true">Measure</button>
+        <button role="tab" data-view="timer-view" aria-selected="false">Timer</button>
+      </nav>
+
+      <div id="measure-view" class="view">
+      <p id="unsupported" class="notice" hidden></p>
+
+      <section class="stats">
+        <div class="stat primary">
+          <span class="label">Current</span>
+          <span class="value"><span id="current">0.0</span> <span class="unit">kg</span></span>
+        </div>
+        <div class="stat">
+          <span class="label">Peak</span>
+          <span class="value"><span id="peak">0.0</span> <span class="unit">kg</span></span>
+        </div>
+        <div class="stat">
+          <span class="label">Time</span>
+          <span class="value"><span id="duration">0.0</span> s</span>
+        </div>
+      </section>
+
+      <div id="bands" class="bands" aria-label="Colour of the force value from each load"></div>
+
+      <canvas id="chart"></canvas>
+
+      <footer>
+        <button id="reset" class="wide">Reset</button>
+        <button id="tare" class="ghost">Tare</button>
+        <button id="export" class="ghost">Export CSV</button>
+      </footer>
+      </div>
+
+      <div id="timer-view" class="view" data-phase="idle" hidden>
+        <div class="timer-main">
+        <div id="timer-gauge" class="gauge" aria-hidden="true" hidden>
+          <div class="gauge-track"><div id="timer-gauge-fill" class="gauge-fill"></div></div>
+        </div>
+        <section class="timer-display">
+          <div id="timer-flash" class="timer-flash"></div>
+          <span id="timer-phase" class="label">Ready</span>
+          <span id="timer-count">7</span>
+          <span class="timer-reps">Rep <span id="timer-reps">0</span></span>
+          <span id="timer-force-row" class="timer-force" hidden>
+            <span id="timer-force-chip" class="chip"><span id="timer-force">0.0</span> <span class="unit">kg</span></span>
+          </span>
+        </section>
+        </div>
+        <footer>
+          <div id="timer-presets" class="presets" role="group" aria-label="Work / rest seconds">
+            <button data-work="7" data-rest="3" aria-pressed="true">7 / 3</button>
+            <button data-work="10" data-rest="3" aria-pressed="false">10 / 3</button>
+            <button data-work="10" data-rest="10" aria-pressed="false">10 / 10</button>
+            <button data-work="10" data-rest="20" aria-pressed="false">10 / 20</button>
+          </div>
+          <button id="timer-mute" class="ghost"></button>
+          <button id="timer-toggle" class="wide">Start</button>
+        </footer>
+      </div>
+    </main>
+  </body>
+</html>

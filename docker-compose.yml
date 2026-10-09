@@ -1,0 +1,21 @@
+# Serves the app behind the nginx-proxy / acme-companion stack in /data/grahsl,
+# which terminates HTTPS and obtains the Let's Encrypt certificate.
+services:
+  web:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      # A directory, not single files: a single-file mount keeps serving the
+      # old copy once an editor replaces the file.
+      - ./public:/usr/share/nginx/html:ro
+    environment:
+      VIRTUAL_HOST: ${FINGER_HOST:-finger.grahsl.net}
+      VIRTUAL_PORT: 80
+      LETSENCRYPT_HOST: ${FINGER_HOST:-finger.grahsl.net}
+    networks:
+      - proxynet
+
+networks:
+  proxynet:
+    name: grahsl_proxynet
+    external: true

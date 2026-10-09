@@ -1,0 +1,411 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #14171c;
+  --muted: #69717d;
+  --grid: #e3e6ea;
+  --accent: #e8590c;
+  --ok: #2b8a3e;
+  --error: #c92a2a;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #101216;
+  --surface: #191c22;
+  --text: #eceef1;
+  --muted: #8d95a1;
+  --grid: #2a2e36;
+  --accent: #ff8a3d;
+  --ok: #51cf66;
+  --error: #ff6b6b;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.4 system-ui, sans-serif;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 960px;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+header,
+footer,
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+header {
+  justify-content: space-between;
+}
+
+h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+#status[data-kind='ok'] {
+  color: var(--ok);
+}
+
+#status[data-kind='error'] {
+  color: var(--error);
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--error);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 8px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.label {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.value {
+  font-size: 28px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stat.primary .value {
+  font-size: 48px;
+}
+
+.value .unit {
+  font-size: 0.5em;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+nav,
+.presets {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+nav button,
+.presets button {
+  flex: 1;
+  padding: 8px 16px;
+  background: transparent;
+  color: var(--muted);
+}
+
+nav button[aria-selected='true'],
+.presets button[aria-pressed='true'] {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.timer-main {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  min-height: 200px;
+}
+
+.gauge {
+  position: relative;
+  width: 96px;
+}
+
+.gauge-track {
+  position: absolute;
+  inset: 0 40px 0 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.gauge-fill {
+  position: absolute;
+  inset: 0;
+  transform: scaleY(0);
+  transform-origin: bottom;
+}
+
+/* Threshold marks: a coloured line across the bar with the kg value beside it. */
+.gauge > span {
+  position: absolute;
+  left: 0;
+  width: 62px;
+  border-bottom: 3px solid;
+}
+
+.gauge > span::after {
+  content: attr(data-kg);
+  position: absolute;
+  left: 100%;
+  margin-left: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 0;
+}
+
+.timer-display {
+  position: relative;
+  overflow: hidden;
+  container-type: size;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+/* Lit briefly just before work starts; animated from timer.js. */
+.timer-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.timer-display .label {
+  font-size: 24px;
+}
+
+#timer-count {
+  font-size: min(20vh, 28vw);
+  font-size: min(22cqh, 30cqw);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.timer-reps {
+  font-size: min(13vh, 16vw);
+  font-size: min(18cqh, 22cqw);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.timer-force {
+  margin-top: 12px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip,
+.bands span {
+  border-radius: 999px;
+  background: #5c636e;
+  color: #fff;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.chip {
+  display: inline-block;
+  min-width: 4.5em;
+  padding: 0.05em 0.4em;
+  border: 3px solid #fff;
+  font-size: min(11vh, 14vw);
+  font-size: min(15cqh, 16cqw);
+  text-align: center;
+}
+
+.chip .unit {
+  font-size: 0.6em;
+  font-weight: 400;
+}
+
+.bands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bands span {
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
+.presets {
+  flex: 2;
+}
+
+.presets button {
+  white-space: nowrap;
+}
+
+.presets button:disabled {
+  opacity: 1;
+}
+
+.presets button:disabled:not([aria-pressed='true']) {
+  opacity: 0.4;
+}
+
+/* --load-color is set while a device is connected: the colour of the current load. */
+[data-phase='work'] .timer-display {
+  background: var(--load-color, var(--accent));
+  color: #fff;
+}
+
+[data-phase='rest'] .timer-display {
+  background: #000;
+  color: #fff;
+}
+
+[data-phase='work'] .label,
+[data-phase='rest'] .label {
+  color: inherit;
+}
+
+canvas {
+  flex: 1;
+  width: 100%;
+  min-height: 200px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+button {
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button.ghost {
+  border-color: var(--grid);
+  background: var(--surface);
+  color: var(--text);
+}
+
+button.danger {
+  background: var(--error);
+}
+
+button.wide {
+  flex: 1;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 520px) {
+  .stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .stat.primary {
+    grid-column: 1 / -1;
+  }
+
+  footer {
+    flex-wrap: wrap;
+  }
+
+  #measure-view button.wide {
+    flex-basis: 100%;
+  }
+
+  .presets {
+    flex-basis: 100%;
+  }
+
+  .presets button {
+    padding: 8px 4px;
+  }
+
+  .timer-main {
+    gap: 10px;
+  }
+
+  .gauge {
+    width: 58px;
+  }
+
+  .gauge-track {
+    right: 30px;
+  }
+
+  .gauge > span {
+    width: 34px;
+  }
+
+  .gauge > span::after {
+    margin-left: 4px;
+    font-size: 12px;
+  }
+
+  .meta {
+    font-size: 12px;
+  }
+}

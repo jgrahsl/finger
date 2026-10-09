@@ -1,0 +1,47 @@
+// Get-ready/work/rest interval sequencing: one beat per second, counted from
+// the start of each phase. Phases with a length of 0 are skipped.
+// config: { ready, work, rest } in seconds.
+
+export function firstBeat(config) {
+  return { phase: config.ready > 0 ? 'ready' : 'work', beat: 0, rep: 1 };
+}
+
+export function nextBeat(state, config) {
+  if (state.beat + 1 < config[state.phase]) {
+    return { ...state, beat: state.beat + 1 };
+  }
+  if (state.phase === 'ready') {
+    return { phase: 'work', beat: 0, rep: state.rep };
+  }
+  if (state.phase === 'work' && config.rest > 0) {
+    return { phase: 'rest', beat: 0, rep: state.rep };
+  }
+  return { phase: 'work', beat: 0, rep: state.rep + 1 };
+}
+
+/** Seconds left in the current phase, including the one this beat starts. */
+export function remaining(state, config) {
+  return config[state.phase] - state.beat;
+}
+
+// A rest only beeps for its final seconds, so long rests stay quiet.
+const REST_BEEPS = 3;
+
+/**
+ * Which tone to play on this beat, or null for silence.
+ *   work:        'start' on its first second, 'work' on the others
+ *   rest:        'end' on its first beat, the moment work is over, so the
+ *                signal to let go comes after the full work time
+ *   ready, rest: 'prepare' then 'last' on the final two seconds before work;
+ *                before that the phase's own tone ('rest' only for the
+ *                third-last second, 'ready' throughout)
+ */
+export function toneFor(state, config) {
+  if (state.phase === 'work') return state.beat === 0 ? 'start' : 'work';
+  const left = remaining(state, config);
+  if (left === 1) return 'last';
+  if (state.phase === 'rest' && state.beat === 0) return 'end';
+  if (left === 2) return 'prepare';
+  if (state.phase === 'rest' && left > REST_BEEPS) return null;
+  return state.phase;
+}
