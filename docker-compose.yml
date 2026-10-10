@@ -8,6 +8,7 @@ services:
       # A directory, not single files: a single-file mount keeps serving the
       # old copy once an editor replaces the file.
       - ./public:/usr/share/nginx/html:ro
+      - ./deploy/nginx:/etc/nginx/conf.d:ro
     environment:
       VIRTUAL_HOST: ${FINGER_HOST:-finger.grahsl.net}
       VIRTUAL_PORT: 80

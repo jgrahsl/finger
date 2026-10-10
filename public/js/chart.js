@@ -1,3 +1,7 @@
+// Shown in the header; bump together with the others on every change, so a
+// stale cached file shows up as a mismatch.
+export const CHART_BUILD = 7;
+
 const PAD = { top: 12, right: 20, bottom: 24, left: 44 };
 
 function niceStep(range, targetTicks) {
@@ -48,6 +52,7 @@ export class Chart {
       grid: style.getPropertyValue('--grid').trim(),
       text: style.getPropertyValue('--muted').trim(),
       line: style.getPropertyValue('--accent').trim(),
+      mark: style.getPropertyValue('--text').trim(),
     };
   }
 
@@ -59,9 +64,11 @@ export class Chart {
   /**
    * @param times   seconds, ascending
    * @param values  kg
-   * @param opts    { tMin, tMax, scale (kg -> display unit), minYMax }
+   * @param opts    { tMin, tMax, scale (kg -> display unit), minYMax, marks }
+   *                marks: dotted reference lines, { times: [{ at, label }],
+   *                values: [{ at, label }] }, in seconds and kg
    */
-  draw(times, values, { tMin, tMax, scale, minYMax }) {
+  draw(times, values, { tMin, tMax, scale, minYMax, marks }) {
     const { ctx, width, height } = this;
     if (this.canvas.offsetParent === null) return; // hidden tab
     const colors = (this.colors ??= this.#readColors());
@@ -149,6 +156,36 @@ export class Chart {
       }
     }
     ctx.stroke();
+
+    if (marks) {
+      ctx.strokeStyle = colors.mark;
+      ctx.fillStyle = colors.mark;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.textBaseline = 'bottom';
+      ctx.textAlign = 'right';
+      for (const { at, label } of marks.values) {
+        const py = Math.round(y(at * scale)) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(PAD.left, py);
+        ctx.lineTo(width - PAD.right, py);
+        ctx.stroke();
+        ctx.fillText(label, width - PAD.right - 4, py - 2);
+      }
+      ctx.textBaseline = 'top';
+      marks.times.forEach(({ at, label }, row) => {
+        const px = Math.round(x(at)) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(px, PAD.top);
+        ctx.lineTo(px, PAD.top + plotH);
+        ctx.stroke();
+        // One row each, so labels of lines close together do not overlap.
+        // Left of the line, clear of the curve, unless there is no room.
+        const fits = px - 4 - ctx.measureText(label).width >= PAD.left;
+        ctx.textAlign = fits ? 'right' : 'left';
+        ctx.fillText(label, fits ? px - 4 : px + 4, PAD.top + 2 + row * 13);
+      });
+    }
     ctx.restore();
   }
 }

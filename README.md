@@ -17,8 +17,20 @@ not support Web Bluetooth; on iOS use the Bluefy browser. On Linux, Chrome needs
 may need `chrome://flags/#enable-experimental-web-platform-features`.
 
 Wake the Progressor, press **Connect** and pick it in the chooser. Streaming starts at once and
-runs until you disconnect; **Reset** clears the recording. **Demo** runs
-the UI against a simulated device.
+runs until you disconnect; **Reset** clears the recording.
+
+The **RFD** tab measures rate of force development. There is nothing to press: once the force has
+been steady for a moment, that is taken as the resting level, and every clear pull after it is
+recorded as an attempt when you let go (or after 5 seconds). A clear pull rises at least 5 kg above
+the resting level and at 20 kg/s or faster. Each attempt shows:
+
+- **Peak RFD** — the steepest rise over any 100 ms window, in kg/s
+- **20–80 % RFD** — the average rise between 20 % and 80 % of that pull's peak force
+- **Peak force** and **time to peak** from the onset, 2 kg above the resting level
+
+The chart marks the onset, the 20 % and 80 % points and the peak with dotted lines.
+
+**Demo** runs the UI against a simulated device.
 
 ## Deploy (home server)
 
@@ -47,10 +59,11 @@ node --test
 Everything served to the browser lives in `public/`:
 
 - `public/index.html`, `public/style.css` — page and styles
-- `public/src/progressor.js` — BLE protocol: UUIDs, commands, packet parsing, `Progressor` class
-- `public/src/simulator.js` — simulated device with the same interface
-- `public/src/app.js` — measure tab, tare, CSV export, theme, tabs
-- `public/src/chart.js` — canvas line chart
-- `public/src/timer.js`, `public/src/interval.js` — interval timer UI/audio and its sequencing
-- `public/src/bands.js` — colour thresholds for force values
-- `public/src/wakelock.js` — keeps the screen on while measuring or timing
+- `public/js/progressor.js` — BLE protocol: UUIDs, commands, packet parsing, `Progressor` class
+- `public/js/simulator.js` — simulated device with the same interface
+- `public/js/app.js` — measure tab, tare, CSV export, theme, tabs
+- `public/js/chart.js` — canvas line chart
+- `public/js/timer.js`, `public/js/interval.js` — interval timer UI/audio and its sequencing
+- `public/js/rfdview.js`, `public/js/rfd.js` — rate of force development tab and its calculation
+- `public/js/bands.js` — colour thresholds for force values
+- `public/js/wakelock.js` — keeps the screen on while measuring or timing

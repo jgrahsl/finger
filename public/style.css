@@ -62,6 +62,12 @@ h1 {
   font-size: 20px;
 }
 
+.build {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
 .meta {
   margin: 0;
   color: var(--muted);
@@ -310,9 +316,45 @@ nav button[aria-selected='true'],
   color: #fff;
 }
 
+/* Load colouring switched off: fixed, calmer colours per phase. */
+[data-load-bg='off'][data-phase='work'] .timer-display {
+  background: #d08548;
+}
+
+[data-load-bg='off'][data-phase='rest'] .timer-display {
+  background: #2c5a45;
+}
+
+#timer-colors[aria-pressed='false'] {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
 [data-phase='work'] .label,
 [data-phase='rest'] .label {
   color: inherit;
+}
+
+.rfd-stats {
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+}
+
+.attempts {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.attempts button {
+  padding: 8px 12px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.attempts button[aria-pressed='true'] {
+  border-color: var(--accent);
 }
 
 canvas {
@@ -366,6 +408,18 @@ button:disabled {
 
   .stat.primary {
     grid-column: 1 / -1;
+  }
+
+  .rfd-stats {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .rfd-stats .stat {
+    padding: 10px 12px;
+  }
+
+  .rfd-stats .stat:not(.primary) .value {
+    font-size: 22px;
   }
 
   footer {

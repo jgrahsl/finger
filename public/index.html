@@ -15,14 +15,27 @@
         var dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
         document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       })();
+      // Show script errors on the page: there is no console on a phone or tablet.
+      function showError(message) {
+        var status = document.getElementById('status');
+        if (!status) return;
+        status.textContent = 'Error: ' + message;
+        status.dataset.kind = 'error';
+      }
+      addEventListener('error', function (event) {
+        showError(event.message + ' (' + String(event.filename).split('/').pop() + ':' + event.lineno + ')');
+      });
+      addEventListener('unhandledrejection', function (event) {
+        showError(event.reason && event.reason.message ? event.reason.message : String(event.reason));
+      });
     </script>
-    <script type="module" src="src/app.js"></script>
+    <script type="module" src="js/app.js"></script>
   </head>
   <body>
     <main>
       <header>
         <div>
-          <h1>Finger</h1>
+          <h1>Finger <span id="build" class="build" data-page="7"></span></h1>
           <p class="meta"><span id="status"></span> <span id="device"></span></p>
         </div>
         <div class="actions">
@@ -35,6 +48,7 @@
       <nav role="tablist">
         <button role="tab" data-view="measure-view" aria-selected="true">Measure</button>
         <button role="tab" data-view="timer-view" aria-selected="false">Timer</button>
+        <button role="tab" data-view="rfd-view" aria-selected="false">RFD</button>
       </nav>
 
       <div id="measure-view" class="view">
@@ -89,7 +103,38 @@
             <button data-work="10" data-rest="20" aria-pressed="false">10 / 20</button>
           </div>
           <button id="timer-mute" class="ghost"></button>
+          <button id="timer-colors" class="ghost">🎨</button>
           <button id="timer-toggle" class="wide">Start</button>
+        </footer>
+      </div>
+
+      <div id="rfd-view" class="view" hidden>
+        <section class="stats rfd-stats">
+          <div class="stat primary">
+            <span class="label">Peak RFD</span>
+            <span class="value"><span id="rfd-peak">–</span> <span class="unit">kg/s</span></span>
+          </div>
+          <div class="stat">
+            <span class="label">20–80 % RFD</span>
+            <span class="value"><span id="rfd-2080">–</span> <span class="unit">kg/s</span></span>
+          </div>
+          <div class="stat">
+            <span class="label">Peak force</span>
+            <span class="value"><span id="rfd-force">–</span> <span class="unit">kg</span></span>
+          </div>
+          <div class="stat">
+            <span class="label">Time to peak</span>
+            <span class="value"><span id="rfd-ttp">–</span> <span class="unit">ms</span></span>
+          </div>
+        </section>
+
+        <p id="rfd-hint" class="meta"></p>
+
+        <canvas id="rfd-chart"></canvas>
+
+        <footer>
+          <div id="rfd-attempts" class="attempts"></div>
+          <button id="rfd-clear" class="ghost">Clear</button>
         </footer>
       </div>
     </main>

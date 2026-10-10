@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseNotification, ResponseTag } from '../public/src/progressor.js';
+import { parseNotification, ResponseTag } from '../public/js/progressor.js';
 
 function packet(tag, payload) {
   const bytes = new Uint8Array(2 + payload.byteLength);

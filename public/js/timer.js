@@ -29,6 +29,7 @@ const el = {
   presets: document.querySelectorAll('#timer-presets button'),
   toggle: $('timer-toggle'),
   mute: $('timer-mute'),
+  colors: $('timer-colors'),
   flash: $('timer-flash'),
 };
 
@@ -42,10 +43,13 @@ export const timer = new EventTarget();
 
 let audio = null;
 let muted = false;
+// Whether the card background follows the current load during work.
+let loadColors = true;
 try {
   muted = localStorage.getItem('muted') === 'true';
+  loadColors = localStorage.getItem('loadColors') !== 'false';
 } catch {
-  // Defaults to sound on.
+  // Defaults to sound on and load colours on.
 }
 let timeout = null;
 let state = null;
@@ -159,6 +163,22 @@ el.mute.addEventListener('click', () => {
   renderMute();
 });
 renderMute();
+
+function renderColors() {
+  el.view.dataset.loadBg = loadColors ? 'on' : 'off';
+  el.colors.setAttribute('aria-pressed', loadColors);
+  el.colors.setAttribute('aria-label', loadColors ? 'Stop colouring the background by load' : 'Colour the background by load');
+}
+el.colors.addEventListener('click', () => {
+  loadColors = !loadColors;
+  try {
+    localStorage.setItem('loadColors', loadColors);
+  } catch {
+    // Still applies for this visit.
+  }
+  renderColors();
+});
+renderColors();
 for (const preset of el.presets) {
   preset.addEventListener('click', () => {
     for (const other of el.presets) other.setAttribute('aria-pressed', other === preset);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { firstBeat, nextBeat, remaining, toneFor } from '../public/src/interval.js';
+import { firstBeat, nextBeat, remaining, toneFor } from '../public/js/interval.js';
 
 function run(config, count) {
   const beats = [];

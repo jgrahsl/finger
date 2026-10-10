@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BANDS, bandColor } from '../public/src/bands.js';
+import { BANDS, bandColor } from '../public/js/bands.js';
 
 test('no colour below the first threshold', () => {
   assert.equal(bandColor(9.99), null);

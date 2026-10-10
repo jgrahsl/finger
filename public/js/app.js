@@ -1,9 +1,14 @@
 import { Progressor } from './progressor.js';
 import { SimulatedProgressor } from './simulator.js';
-import { Chart } from './chart.js';
+import { Chart, CHART_BUILD } from './chart.js';
 import { holdScreen } from './wakelock.js';
 import { timer } from './timer.js';
+import { rfdView, RFDVIEW_BUILD, RFD_BUILD } from './rfdview.js';
 import { BANDS, BELOW_BANDS_COLOR, bandColor } from './bands.js';
+
+// Shown in the header; bump together with the others on every change, so a
+// stale cached file shows up as a mismatch.
+const APP_BUILD = 7;
 
 const MIN_Y_MAX_KG = 5;
 const LIVE_WINDOW_S = 30;
@@ -61,6 +66,7 @@ function render() {
   el.tare.disabled = !state.measuring;
   el.timerForceRow.hidden = !connected;
   el.gauge.hidden = !connected;
+  rfdView.setConnected(connected);
   invalidate();
 }
 
@@ -115,6 +121,7 @@ function onSamples(event) {
     state.raw.push(weight);
     state.values.push(value);
     if (value > state.peak) state.peak = value;
+    rfdView.push(time / 1e6, value);
   }
   invalidate();
 }
@@ -267,6 +274,7 @@ function setTheme(theme) {
   el.theme.textContent = other === 'dark' ? '☾' : '☀';
   el.theme.setAttribute('aria-label', `Switch to ${other} theme`);
   chart.refreshColors();
+  rfdView.refreshColors();
   invalidate();
 }
 
@@ -313,6 +321,14 @@ for (const band of BANDS) {
   tick.style.bottom = `${(band.from / GAUGE_MAX_KG) * 100}%`;
   tick.style.borderColor = band.color;
   el.gauge.append(tick);
+}
+
+{
+  const builds = { page: Number($('build').dataset.page), app: APP_BUILD, chart: CHART_BUILD, rfd: RFD_BUILD, rfdview: RFDVIEW_BUILD };
+  const stale = new Set(Object.values(builds)).size > 1;
+  $('build').textContent = stale
+    ? `stale files: ${Object.entries(builds).map(([name, build]) => `${name} ${build}`).join(' · ')}`
+    : `v${APP_BUILD}`;
 }
 
 setStatus('Disconnected');
