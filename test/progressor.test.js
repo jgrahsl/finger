@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseNotification, ResponseTag } from '../public/js/progressor.js';
+import { parseNotification, ResponseTag, timeUnwrapper } from '../public/js/progressor.js';
 
 function packet(tag, payload) {
   const bytes = new Uint8Array(2 + payload.byteLength);
@@ -49,4 +49,14 @@ test('exposes the payload of a command response', () => {
   assert.equal(result.tag, ResponseTag.CMD_RESPONSE);
   assert.equal(result.samples, undefined);
   assert.equal(result.payload.getUint32(0, true), 3850);
+});
+
+test('device time keeps rising when the 32-bit counter starts over', () => {
+  const unwrap = timeUnwrapper();
+  assert.equal(unwrap(0), 0);
+  assert.equal(unwrap(4294960000), 4294960000);
+  assert.equal(unwrap(5000), 2 ** 32 + 5000);
+  assert.equal(unwrap(17500), 2 ** 32 + 17500);
+  // A sample slightly out of order is not a new turn of the counter.
+  assert.equal(unwrap(17000), 2 ** 32 + 17000);
 });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { firstBeat, nextBeat, remaining, toneFor } from '../public/js/interval.js';
+import { advance, firstBeat, nextBeat, remaining, toneFor } from '../public/js/interval.js';
 
 function run(config, count) {
   const beats = [];
@@ -37,4 +37,11 @@ test('a long rest signals the end of work, then is silent until its last three s
     'end', 'null', 'null', 'null', 'null', 'null', 'null', 'rest', 'prepare', 'last',
   ]);
   assert.equal(beats[11], 'start:1:2');
+});
+
+test('advancing by several beats lands where single steps would', () => {
+  const config = { ready: 5, work: 7, rest: 3 };
+  // 5 s ready, then 10 s per rep: 62 s in is the first second of rep 6's rest.
+  assert.deepEqual(advance(firstBeat(config), config, 62), { phase: 'rest', beat: 0, rep: 6 });
+  assert.deepEqual(advance(firstBeat(config), config, 0), firstBeat(config));
 });

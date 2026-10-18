@@ -54,8 +54,23 @@ export function parseNotification(view) {
 }
 
 /**
+ * The device clock is a 32-bit count of microseconds, which starts again
+ * from zero after about 71 minutes. Returns a function that turns it into a
+ * time that keeps rising.
+ */
+export function timeUnwrapper() {
+  let last = 0;
+  let turns = 0;
+  return (time) => {
+    if (time < last - 2 ** 31) turns++;
+    last = time;
+    return turns * 2 ** 32 + time;
+  };
+}
+
+/**
  * Events:
- *   samples      detail: [{ weight (kg), time (µs since measurement start) }]
+ *   samples      detail: [{ weight (kg), time (µs since measurement start, ever rising) }]
  *   lowbattery
  *   disconnected
  */
@@ -65,6 +80,7 @@ export class Progressor extends EventTarget {
   #control = null;
   #queue = Promise.resolve();
   #pending = null;
+  #unwrap = timeUnwrapper();
 
   static get supported() {
     return typeof navigator !== 'undefined' && 'bluetooth' in navigator;
@@ -85,12 +101,19 @@ export class Progressor extends EventTarget {
     });
     this.#device.addEventListener('gattserverdisconnected', this.#onDisconnect);
 
-    const server = await this.#device.gatt.connect();
-    const service = await server.getPrimaryService(SERVICE_UUID);
-    this.#data = await service.getCharacteristic(DATA_UUID);
-    this.#control = await service.getCharacteristic(CONTROL_UUID);
-    this.#data.addEventListener('characteristicvaluechanged', this.#onData);
-    await this.#data.startNotifications();
+    try {
+      const server = await this.#device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      this.#data = await service.getCharacteristic(DATA_UUID);
+      this.#control = await service.getCharacteristic(CONTROL_UUID);
+      this.#data.addEventListener('characteristicvaluechanged', this.#onData);
+      await this.#data.startNotifications();
+    } catch (error) {
+      // Do not leave a half-set-up link open.
+      this.#device.removeEventListener('gattserverdisconnected', this.#onDisconnect);
+      this.#device.gatt.disconnect();
+      throw error;
+    }
   }
 
   disconnect() {
@@ -98,6 +121,7 @@ export class Progressor extends EventTarget {
   }
 
   startMeasurement() {
+    this.#unwrap = timeUnwrapper();
     return this.#send(Command.START_WEIGHT_MEAS);
   }
 
@@ -129,13 +153,23 @@ export class Progressor extends EventTarget {
     const run = async () => {
       if (!this.connected) throw new Error('Progressor is not connected');
       const response = expectResponse ? this.#awaitResponse() : null;
+      // It can fail while the write is still under way; the caller gets that
+      // failure from the write, so this one must not count as unhandled.
+      response?.catch(() => {});
       const packet = Uint8Array.of(opcode, 0);
       // Older implementations (e.g. WebBLE-based iOS browsers) only have writeValue.
       const control = this.#control;
       const write =
         (control.properties.write ? control.writeValueWithResponse : control.writeValueWithoutResponse) ??
         control.writeValue;
-      await write.call(control, packet);
+      try {
+        await write.call(control, packet);
+      } catch (error) {
+        // Nothing was sent, so no response will come.
+        if (this.#pending) clearTimeout(this.#pending.timer);
+        this.#pending = null;
+        throw error;
+      }
       return response;
     };
     const result = this.#queue.then(run, run);
@@ -157,6 +191,7 @@ export class Progressor extends EventTarget {
     const packet = parseNotification(event.target.value);
     switch (packet.tag) {
       case ResponseTag.WEIGHT_MEASURE:
+        for (const sample of packet.samples) sample.time = this.#unwrap(sample.time);
         this.dispatchEvent(new CustomEvent('samples', { detail: packet.samples }));
         break;
       case ResponseTag.CMD_RESPONSE:

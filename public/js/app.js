@@ -8,18 +8,26 @@ import { BANDS, BELOW_BANDS_COLOR, bandColor } from './bands.js';
 
 // Shown in the header; bump together with the others on every change, so a
 // stale cached file shows up as a mismatch.
-const APP_BUILD = 7;
+const APP_BUILD = 15;
 
 const MIN_Y_MAX_KG = 5;
 const LIVE_WINDOW_S = 30;
 const TARE_WINDOW_S = 0.5;
 const MIN_FRAME_MS = 50;
 const GAUGE_MAX_KG = 50;
+// A work phase shows a plain signal colour until the pull exceeds this.
+const ENGAGE_KG = 8;
+const STOP_TIMEOUT_MS = 1000;
+// The sampling rate shown is the number of samples received per this long.
+const RATE_WINDOW_MS = 1000;
+// No samples for this long shows as 0 Hz.
+const RATE_STALE_MS = 1500;
 
 const $ = (id) => document.getElementById(id);
 const el = {
   status: $('status'),
   device: $('device'),
+  rate: $('rate'),
   connect: $('connect'),
   demo: $('demo'),
   reset: $('reset'),
@@ -42,14 +50,19 @@ const el = {
 const chart = new Chart($('chart'));
 const state = {
   device: null,
+  busy: false, // connecting or disconnecting
   measuring: false,
   times: [], // s since the recording was last reset
-  timeOrigin: null, // device time (s) of the first sample of the recording
+  timeOrigin: null, // device time (s) that corresponds to 0 in the recording
+  recordingStartedAt: null, // Date.now() of the first sample of the recording
   values: [], // kg, tare applied
   raw: [], // kg, as reported by the device
   tareOffset: 0,
   peak: 0,
   timerPhase: null, // 'ready' | 'work' | 'rest' while the timer runs
+  timerRep: 0,
+  rate: null, // samples/s as received, while connected
+  engaged: false, // the pull has exceeded ENGAGE_KG in this work phase
 };
 
 function setStatus(text, kind = '') {
@@ -60,8 +73,9 @@ function setStatus(text, kind = '') {
 function render() {
   const connected = Boolean(state.device);
   el.connect.textContent = connected ? 'Disconnect' : 'Connect';
-  el.connect.disabled = !connected && !Progressor.supported;
+  el.connect.disabled = state.busy || (!connected && !Progressor.supported);
   el.demo.hidden = connected;
+  el.demo.disabled = state.busy;
   el.reset.disabled = !connected;
   el.tare.disabled = !state.measuring;
   el.timerForceRow.hidden = !connected;
@@ -97,6 +111,7 @@ function frame() {
   el.timerForceChip.style.background = bandColor(currentKg) ?? '';
   if (state.device) el.timerView.style.setProperty('--load-color', bandColor(currentKg) ?? BELOW_BANDS_COLOR);
   else el.timerView.style.removeProperty('--load-color');
+  el.timerView.toggleAttribute('data-awaiting-pull', Boolean(state.device) && state.timerPhase === 'work' && !state.engaged);
   // The bar shows the colour of the current load, except in a rest: grey.
   const gaugeColor = state.timerPhase === 'rest' ? null : bandColor(currentKg);
   el.gaugeFill.style.background = gaugeColor ?? BELOW_BANDS_COLOR;
@@ -104,6 +119,7 @@ function frame() {
   el.peak.textContent = format(state.peak);
   el.duration.textContent = last.toFixed(1);
   el.timerForce.textContent = el.current.textContent;
+  el.rate.textContent = state.device && state.rate !== null ? `· ${Math.round(state.rate)} Hz` : '';
   el.exportCsv.disabled = n === 0;
 
   const live = state.measuring || n === 0;
@@ -112,15 +128,46 @@ function frame() {
   chart.draw(state.times, state.values, { tMin, tMax, scale: 1, minYMax: MIN_Y_MAX_KG });
 }
 
+// Counts samples as they arrive, so drop-outs in the Bluetooth link show.
+const rateCount = { since: 0, samples: 0 };
+let rateStale = null;
+
+function countSamples(samples) {
+  const now = Date.now();
+  if (rateCount.since === 0) rateCount.since = now;
+  rateCount.samples += samples;
+  if (now - rateCount.since >= RATE_WINDOW_MS) {
+    state.rate = (rateCount.samples * 1000) / (now - rateCount.since);
+    rateCount.since = now;
+    rateCount.samples = 0;
+  }
+  clearTimeout(rateStale);
+  rateStale = setTimeout(() => {
+    state.rate = 0;
+    rateCount.since = 0;
+    rateCount.samples = 0;
+    invalidate();
+  }, RATE_STALE_MS);
+}
+
 function onSamples(event) {
   if (!state.measuring) return;
+  countSamples(event.detail.length);
   for (const { weight, time } of event.detail) {
+    if (!Number.isFinite(weight)) continue;
     const value = weight - state.tareOffset;
-    state.timeOrigin ??= time / 1e6;
+    if (state.timeOrigin === null) {
+      // A stream that starts while a recording is kept (a reconnect during a
+      // timer session) continues it after a gap as long as the outage.
+      state.recordingStartedAt ??= Date.now();
+      const resumeAt = Math.max(state.times.at(-1) ?? 0, (Date.now() - state.recordingStartedAt) / 1000);
+      state.timeOrigin = time / 1e6 - resumeAt;
+    }
     state.times.push(time / 1e6 - state.timeOrigin);
     state.raw.push(weight);
     state.values.push(value);
     if (value > state.peak) state.peak = value;
+    if (state.timerPhase === 'work' && value > ENGAGE_KG) state.engaged = true;
     rfdView.push(time / 1e6, value);
   }
   invalidate();
@@ -129,6 +176,10 @@ function onSamples(event) {
 function onDisconnected() {
   state.device = null;
   state.measuring = false;
+  state.rate = null;
+  clearTimeout(rateStale);
+  rateCount.since = 0;
+  rateCount.samples = 0;
   holdScreen('measure', false);
   el.device.textContent = '';
   setStatus('Disconnected');
@@ -136,6 +187,9 @@ function onDisconnected() {
 }
 
 async function connect(device) {
+  if (state.device || state.busy) return;
+  state.busy = true;
+  render();
   setStatus('Connecting…');
   try {
     await device.connect();
@@ -143,6 +197,9 @@ async function connect(device) {
     // NotFoundError: the user dismissed the device chooser.
     setStatus(error.name === 'NotFoundError' ? 'Disconnected' : `Connection failed: ${error.message}`, error.name === 'NotFoundError' ? '' : 'error');
     return;
+  } finally {
+    state.busy = false;
+    render();
   }
   device.addEventListener('samples', onSamples);
   device.addEventListener('disconnected', onDisconnected);
@@ -172,6 +229,7 @@ function reset() {
   state.values = [];
   state.raw = [];
   state.timeOrigin = null;
+  state.recordingStartedAt = null;
   state.peak = 0;
   invalidate();
 }
@@ -179,15 +237,20 @@ function reset() {
 // Streaming starts as soon as a device is connected and runs until it is
 // disconnected.
 async function start() {
-  if (!state.device || state.measuring) return;
-  reset();
+  const device = state.device;
+  if (!device || state.measuring) return;
+  // While the timer runs the recording belongs to its session: a device that
+  // drops out and comes back continues it instead of wiping it.
+  if (state.timerPhase === null) reset();
+  else state.timeOrigin = null; // the device clock starts again
   state.measuring = true;
   render();
   holdScreen('measure', true);
   try {
-    await state.device.startMeasurement();
-    setStatus('Measuring', 'ok');
+    await device.startMeasurement();
+    if (state.device === device) setStatus('Measuring', 'ok');
   } catch (error) {
+    if (state.device !== device) return; // gone meanwhile; already reported
     state.measuring = false;
     holdScreen('measure', false);
     setStatus(`Could not start: ${error.message}`, 'error');
@@ -197,12 +260,19 @@ async function start() {
 
 async function disconnect() {
   const device = state.device;
+  if (!device || state.busy) return;
+  state.busy = true;
+  render();
   try {
-    if (state.measuring) await device.stopMeasurement();
+    // Do not let a device that no longer answers hold up the disconnect.
+    const timeout = new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS));
+    if (state.measuring) await Promise.race([device.stopMeasurement(), timeout]);
   } catch {
     // Disconnecting ends the stream anyway.
   }
+  state.busy = false;
   device.disconnect();
+  render();
 }
 
 // Zero on the mean of the most recent raw readings. Done in software so it
@@ -258,7 +328,11 @@ for (const tab of document.querySelectorAll('nav button')) {
 // Starting the timer starts a fresh recording, so the chart covers the session.
 timer.addEventListener('start', reset);
 timer.addEventListener('beat', (event) => {
-  state.timerPhase = event.detail.phase;
+  // Each work phase starts out waiting for the pull again.
+  const { phase, rep } = event.detail;
+  if (phase !== state.timerPhase || rep !== state.timerRep) state.engaged = false;
+  state.timerPhase = phase;
+  state.timerRep = rep;
   invalidate();
 });
 timer.addEventListener('stop', () => {

@@ -35,8 +35,8 @@
     <main>
       <header>
         <div>
-          <h1>Finger <span id="build" class="build" data-page="7"></span></h1>
-          <p class="meta"><span id="status"></span> <span id="device"></span></p>
+          <h1>Finger <span id="build" class="build" data-page="15"></span></h1>
+          <p class="meta"><span id="status"></span> <span id="device"></span> <span id="rate"></span></p>
         </div>
         <div class="actions">
           <button id="theme" class="ghost"></button>
@@ -99,10 +99,18 @@
           <div id="timer-presets" class="presets" role="group" aria-label="Work / rest seconds">
             <button data-work="7" data-rest="3" aria-pressed="true">7 / 3</button>
             <button data-work="10" data-rest="3" aria-pressed="false">10 / 3</button>
+            <button data-work="10" data-rest="5" aria-pressed="false">10 / 5</button>
             <button data-work="10" data-rest="10" aria-pressed="false">10 / 10</button>
             <button data-work="10" data-rest="20" aria-pressed="false">10 / 20</button>
           </div>
           <button id="timer-mute" class="ghost"></button>
+          <select id="timer-sound" class="ghost" aria-label="Sound">
+            <option value="beep">Beep</option>
+            <option value="chime">Chime</option>
+            <option value="wood">Wood</option>
+            <option value="buzz">Buzz</option>
+            <option value="chirp">Chirp</option>
+          </select>
           <button id="timer-colors" class="ghost">🎨</button>
           <button id="timer-toggle" class="wide">Start</button>
         </footer>

@@ -19,6 +19,12 @@ export function nextBeat(state, config) {
   return { phase: 'work', beat: 0, rep: state.rep + 1 };
 }
 
+/** The state `beats` beats after `state`. */
+export function advance(state, config, beats) {
+  for (let i = 0; i < beats; i++) state = nextBeat(state, config);
+  return state;
+}
+
 /** Seconds left in the current phase, including the one this beat starts. */
 export function remaining(state, config) {
   return config[state.phase] - state.beat;
