@@ -125,6 +125,19 @@ export class Progressor extends EventTarget {
     return this.#send(Command.START_WEIGHT_MEAS);
   }
 
+  /**
+   * For a stream that has gone quiet while the link is still up: subscribes
+   * to the data again (iOS can drop it, e.g. around a locked screen) and
+   * restarts the measurement.
+   */
+  restartStream() {
+    const resubscribe = this.#enqueue(async () => {
+      await this.#data.startNotifications();
+    });
+    resubscribe.catch(() => {}); // already subscribed, or not supported again
+    return this.startMeasurement();
+  }
+
   stopMeasurement() {
     return this.#send(Command.STOP_WEIGHT_MEAS);
   }
@@ -148,10 +161,19 @@ export class Progressor extends EventTarget {
     return new TextDecoder().decode(payload).replace(/\0+$/, '');
   }
 
-  // GATT allows one operation at a time, so commands are serialized.
-  #send(opcode, expectResponse = false) {
+  // GATT allows one operation at a time, so they are serialized.
+  #enqueue(operation) {
     const run = async () => {
       if (!this.connected) throw new Error('Progressor is not connected');
+      return operation();
+    };
+    const result = this.#queue.then(run, run);
+    this.#queue = result.catch(() => {});
+    return result;
+  }
+
+  #send(opcode, expectResponse = false) {
+    return this.#enqueue(async () => {
       const response = expectResponse ? this.#awaitResponse() : null;
       // It can fail while the write is still under way; the caller gets that
       // failure from the write, so this one must not count as unhandled.
@@ -171,10 +193,7 @@ export class Progressor extends EventTarget {
         throw error;
       }
       return response;
-    };
-    const result = this.#queue.then(run, run);
-    this.#queue = result.catch(() => {});
-    return result;
+    });
   }
 
   #awaitResponse() {

@@ -8,7 +8,7 @@ import { BANDS, BELOW_BANDS_COLOR, bandColor } from './bands.js';
 
 // Shown in the header; bump together with the others on every change, so a
 // stale cached file shows up as a mismatch.
-const APP_BUILD = 15;
+const APP_BUILD = 21;
 
 const MIN_Y_MAX_KG = 5;
 const LIVE_WINDOW_S = 30;
@@ -20,8 +20,17 @@ const ENGAGE_KG = 8;
 const STOP_TIMEOUT_MS = 1000;
 // The sampling rate shown is the number of samples received per this long.
 const RATE_WINDOW_MS = 1000;
-// No samples for this long shows as 0 Hz.
-const RATE_STALE_MS = 1500;
+// No samples for this long while connected counts as a stalled stream: it
+// shows as 0 Hz and the stream is restarted, every RETRY_MS until data flows.
+const STALL_MS = 1500;
+const RETRY_MS = 3000;
+// To save battery the Progressor is disconnected when nothing has happened
+// for IDLE_MS (no touch, no load above ACTIVE_KG, no timer running), or when
+// the page has been hidden (screen off, other app) for HIDDEN_MS with no
+// timer running.
+const IDLE_MS = 5 * 60 * 1000;
+const HIDDEN_MS = 30 * 1000;
+const ACTIVE_KG = 2;
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -130,7 +139,28 @@ function frame() {
 
 // Counts samples as they arrive, so drop-outs in the Bluetooth link show.
 const rateCount = { since: 0, samples: 0 };
-let rateStale = null;
+let watchdog = null;
+let stalled = false;
+
+function armWatchdog(ms = STALL_MS) {
+  clearTimeout(watchdog);
+  watchdog = setTimeout(onStall, ms);
+}
+
+function onStall() {
+  state.rate = 0;
+  rateCount.since = 0;
+  rateCount.samples = 0;
+  invalidate();
+  const device = state.device;
+  if (!device || !state.measuring) return;
+  stalled = true;
+  setStatus('No data, restarting the stream…', 'error');
+  // The device clock starts again; the recording carries on after a gap.
+  state.timeOrigin = null;
+  device.restartStream().catch(() => {});
+  armWatchdog(RETRY_MS);
+}
 
 function countSamples(samples) {
   const now = Date.now();
@@ -141,18 +171,17 @@ function countSamples(samples) {
     rateCount.since = now;
     rateCount.samples = 0;
   }
-  clearTimeout(rateStale);
-  rateStale = setTimeout(() => {
-    state.rate = 0;
-    rateCount.since = 0;
-    rateCount.samples = 0;
-    invalidate();
-  }, RATE_STALE_MS);
+  armWatchdog();
+  if (stalled) {
+    stalled = false;
+    setStatus('Measuring', 'ok');
+  }
 }
 
 function onSamples(event) {
   if (!state.measuring) return;
   countSamples(event.detail.length);
+  if (event.detail.some(({ weight }) => Math.abs(weight - state.tareOffset) > ACTIVE_KG)) noteActivity();
   for (const { weight, time } of event.detail) {
     if (!Number.isFinite(weight)) continue;
     const value = weight - state.tareOffset;
@@ -173,16 +202,57 @@ function onSamples(event) {
   invalidate();
 }
 
+let lastActivity = Date.now();
+let idleTimer = null;
+let hiddenTimer = null;
+let autoDisconnectReason = null;
+
+function noteActivity() {
+  lastActivity = Date.now();
+}
+
+function armIdle() {
+  clearTimeout(idleTimer);
+  if (state.device) idleTimer = setTimeout(checkIdle, lastActivity + IDLE_MS - Date.now());
+}
+
+function checkIdle() {
+  if (!state.device) return;
+  if (state.timerPhase !== null) noteActivity();
+  if (Date.now() - lastActivity >= IDLE_MS) autoDisconnect('after 5 minutes without use');
+  else armIdle();
+}
+
+function autoDisconnect(reason) {
+  if (!state.device || state.busy) return;
+  autoDisconnectReason = reason;
+  disconnect();
+}
+
+document.addEventListener('visibilitychange', () => {
+  clearTimeout(hiddenTimer);
+  if (!document.hidden || !state.device || state.timerPhase !== null) return;
+  hiddenTimer = setTimeout(() => {
+    // Checked again: after a suspension this can run late, on return.
+    if (document.hidden && state.timerPhase === null) autoDisconnect('while the screen was off');
+  }, HIDDEN_MS);
+});
+for (const type of ['pointerdown', 'keydown']) document.addEventListener(type, noteActivity, { passive: true });
+
 function onDisconnected() {
+  clearTimeout(idleTimer);
+  clearTimeout(hiddenTimer);
   state.device = null;
   state.measuring = false;
   state.rate = null;
-  clearTimeout(rateStale);
+  clearTimeout(watchdog);
+  stalled = false;
   rateCount.since = 0;
   rateCount.samples = 0;
   holdScreen('measure', false);
   el.device.textContent = '';
-  setStatus('Disconnected');
+  setStatus(autoDisconnectReason ? `Disconnected ${autoDisconnectReason}, to save battery` : 'Disconnected');
+  autoDisconnectReason = null;
   render();
 }
 
@@ -205,6 +275,8 @@ async function connect(device) {
   device.addEventListener('disconnected', onDisconnected);
   device.addEventListener('lowbattery', () => setStatus('Low battery', 'error'));
   state.device = device;
+  noteActivity();
+  armIdle();
   setStatus('Connected', 'ok');
   render();
   await refreshDeviceInfo();
@@ -248,7 +320,9 @@ async function start() {
   holdScreen('measure', true);
   try {
     await device.startMeasurement();
-    if (state.device === device) setStatus('Measuring', 'ok');
+    if (state.device !== device) return;
+    setStatus('Measuring', 'ok');
+    armWatchdog(); // also catches a stream that never starts
   } catch (error) {
     if (state.device !== device) return; // gone meanwhile; already reported
     state.measuring = false;
@@ -329,6 +403,7 @@ for (const tab of document.querySelectorAll('nav button')) {
 timer.addEventListener('start', reset);
 timer.addEventListener('beat', (event) => {
   // Each work phase starts out waiting for the pull again.
+  noteActivity();
   const { phase, rep } = event.detail;
   if (phase !== state.timerPhase || rep !== state.timerRep) state.engaged = false;
   state.timerPhase = phase;

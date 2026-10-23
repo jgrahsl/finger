@@ -35,7 +35,7 @@
     <main>
       <header>
         <div>
-          <h1>Finger <span id="build" class="build" data-page="15"></span></h1>
+          <h1>Finger <span id="build" class="build" data-page="21"></span></h1>
           <p class="meta"><span id="status"></span> <span id="device"></span> <span id="rate"></span></p>
         </div>
         <div class="actions">
@@ -81,6 +81,10 @@
       </div>
 
       <div id="timer-view" class="view" data-phase="idle" hidden>
+        <div class="rep-progress" aria-hidden="true">
+          <div id="timer-progress-parts" class="rep-progress-parts"></div>
+          <div id="timer-progress-veil" class="rep-progress-veil"></div>
+        </div>
         <div class="timer-main">
         <div id="timer-gauge" class="gauge" aria-hidden="true" hidden>
           <div class="gauge-track"><div id="timer-gauge-fill" class="gauge-fill"></div></div>
@@ -90,6 +94,11 @@
           <span id="timer-phase" class="label">Ready</span>
           <span id="timer-count">7</span>
           <span class="timer-reps">Rep <span id="timer-reps">0</span></span>
+          <div id="timer-rep-controls" class="rep-controls" role="group" aria-label="Correct the rep count" hidden>
+            <button id="timer-rep-down" aria-label="One rep less">−</button>
+            <button id="timer-rep-zero" aria-label="Reps to zero">0</button>
+            <button id="timer-rep-up" aria-label="One rep more">+</button>
+          </div>
           <span id="timer-force-row" class="timer-force" hidden>
             <span id="timer-force-chip" class="chip"><span id="timer-force">0.0</span> <span class="unit">kg</span></span>
           </span>
@@ -104,14 +113,8 @@
             <button data-work="10" data-rest="20" aria-pressed="false">10 / 20</button>
           </div>
           <button id="timer-mute" class="ghost"></button>
-          <select id="timer-sound" class="ghost" aria-label="Sound">
-            <option value="beep">Beep</option>
-            <option value="chime">Chime</option>
-            <option value="wood">Wood</option>
-            <option value="buzz">Buzz</option>
-            <option value="chirp">Chirp</option>
-          </select>
           <button id="timer-colors" class="ghost">🎨</button>
+          <button id="timer-pause" class="ghost" disabled>Pause</button>
           <button id="timer-toggle" class="wide">Start</button>
         </footer>
       </div>

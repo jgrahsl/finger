@@ -331,6 +331,78 @@ nav button[aria-selected='true'],
   background: #2c5a45;
 }
 
+/* Progress from one change of the rep count to the next. The coloured parts
+   show what the stretch is made of; a veil over what is still to come
+   shrinks from the left as time passes. */
+.rep-progress {
+  position: relative;
+  flex: none;
+  height: 22px;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.rep-progress-parts {
+  display: flex;
+  gap: 2px;
+  height: 100%;
+}
+
+.rep-progress-parts span {
+  min-width: 0;
+}
+
+.rep-progress-parts [data-kind='ready'] {
+  background: #8d95a1;
+}
+
+.rep-progress-parts [data-kind='cue'] {
+  background: #ffd60a;
+}
+
+.rep-progress-parts [data-kind='work'] {
+  background: var(--accent);
+}
+
+.rep-progress-parts [data-kind='rest'] {
+  background: #4a5260;
+}
+
+.rep-progress-veil {
+  position: absolute;
+  inset: 0;
+  background: var(--surface);
+  opacity: 0.75;
+  transform-origin: right;
+  will-change: transform;
+}
+
+/* Corner buttons to correct the rep count; they take the card's text colour
+   so they read on every background. */
+.rep-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  display: flex;
+  gap: 8px;
+}
+
+.rep-controls button {
+  min-width: 52px;
+  height: 48px;
+  padding: 0 12px;
+  border: 2px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 24px;
+  line-height: 1;
+}
+
+[data-paused] .timer-display > :not(.rep-controls, .timer-flash) {
+  opacity: 0.5;
+}
+
 #timer-colors[aria-pressed='false'] {
   opacity: 0.4;
   filter: grayscale(1);
@@ -388,22 +460,6 @@ button.ghost {
   border-color: var(--grid);
   background: var(--surface);
   color: var(--text);
-}
-
-select.ghost {
-  padding: 10px 12px;
-  border: 1px solid var(--grid);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 16px; /* smaller makes iOS zoom in on focus */
-  font-weight: 600;
-  cursor: pointer;
-}
-
-select.ghost:disabled {
-  opacity: 0.5;
 }
 
 button.danger {

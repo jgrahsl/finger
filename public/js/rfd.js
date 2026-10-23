@@ -9,7 +9,7 @@
 
 // Shown in the header; bump together with the others on every change, so a
 // stale cached file shows up as a mismatch.
-export const RFD_BUILD = 15;
+export const RFD_BUILD = 21;
 
 export const ONSET_KG = 2;
 /** Pulls that never rise this far above the resting level are dropped. */
@@ -90,7 +90,9 @@ export class PullDetector {
   }
 
   push(time, value) {
-    if (this.#times.length && time - this.#times.at(-1) > MAX_GAP_S) this.#clear();
+    // A gap, or a device clock that started again: begin afresh.
+    const last = this.#times.at(-1);
+    if (last !== undefined && (time - last > MAX_GAP_S || time < last)) this.#clear();
     this.#times.push(time);
     this.#values.push(value);
 

@@ -30,6 +30,55 @@ export function remaining(state, config) {
   return config[state.phase] - state.beat;
 }
 
+/**
+ * The rep number to show: the rep the current work belongs to, 0 while
+ * getting ready, except in the last second before work, the moment of the
+ * cue, which already shows the coming rep.
+ */
+export function shownRep(state, config) {
+  const cue = state.phase !== 'work' && remaining(state, config) === 1;
+  if (state.phase === 'ready') return cue ? state.rep : state.rep - 1;
+  return cue ? state.rep + 1 : state.rep;
+}
+
+/**
+ * Where this beat lies between two changes of the rep count, for a progress
+ * bar that fills up just as the count goes up.
+ *   kind     'ready' before the first rep; 'rep' from one cue before work to the next
+ *   total    seconds in that stretch; elapsed: whole seconds of it already past
+ *   parts    its stretches in order, as { kind: 'ready' | 'cue' | 'work' | 'rest', seconds }
+ */
+export function repProgress(state, config) {
+  const cue = state.phase !== 'work' && remaining(state, config) === 1;
+  if (state.phase === 'ready' && !cue) {
+    const total = Math.max(1, config.ready - 1);
+    return { kind: 'ready', total, elapsed: state.beat, parts: [{ kind: 'ready', seconds: total }] };
+  }
+  const stretch = repStretch(config);
+  // Seconds since the cue, which is the last second of the rest (or of the
+  // get-ready) before the work; without rests there is no cue.
+  const lead = config.rest > 0 ? 1 : 0;
+  const elapsed = cue ? 0 : state.phase === 'work' ? lead + state.beat : lead + config.work + state.beat;
+  return { ...stretch, elapsed: Math.min(elapsed, stretch.total - 1) };
+}
+
+function repStretch(config) {
+  const parts =
+    config.rest > 0
+      ? [
+          { kind: 'cue', seconds: 1 },
+          { kind: 'work', seconds: config.work },
+          { kind: 'rest', seconds: config.rest - 1 },
+        ]
+      : [{ kind: 'work', seconds: config.work }];
+  return { kind: 'rep', total: config.work + config.rest, elapsed: 0, parts: parts.filter((part) => part.seconds > 0) };
+}
+
+/** The bar before the timer is started: one rep, nothing done. */
+export function idleRepProgress(config) {
+  return repStretch(config);
+}
+
 // A rest only beeps for its final seconds, so long rests stay quiet.
 const REST_BEEPS = 3;
 

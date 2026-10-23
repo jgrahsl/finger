@@ -26,6 +26,10 @@ export class SimulatedProgressor extends EventTarget {
     this.#timer = setInterval(() => this.#emit(), BATCH_MS);
   }
 
+  restartStream() {
+    return this.startMeasurement();
+  }
+
   async stopMeasurement() {
     this.#stop();
   }
