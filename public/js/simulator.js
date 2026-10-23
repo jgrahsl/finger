@@ -36,6 +36,8 @@ export class SimulatedProgressor extends EventTarget {
 
   async tare() {}
 
+  async sleep() {}
+
   async getBatteryVoltage() {
     return 3850;
   }

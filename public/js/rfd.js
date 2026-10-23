@@ -9,7 +9,7 @@
 
 // Shown in the header; bump together with the others on every change, so a
 // stale cached file shows up as a mismatch.
-export const RFD_BUILD = 21;
+export const RFD_BUILD = 22;
 
 export const ONSET_KG = 2;
 /** Pulls that never rise this far above the resting level are dropped. */

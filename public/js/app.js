@@ -8,7 +8,7 @@ import { BANDS, BELOW_BANDS_COLOR, bandColor } from './bands.js';
 
 // Shown in the header; bump together with the others on every change, so a
 // stale cached file shows up as a mismatch.
-const APP_BUILD = 21;
+const APP_BUILD = 22;
 
 const MIN_Y_MAX_KG = 5;
 const LIVE_WINDOW_S = 30;
@@ -337,13 +337,14 @@ async function disconnect() {
   if (!device || state.busy) return;
   state.busy = true;
   render();
-  try {
-    // Do not let a device that no longer answers hold up the disconnect.
-    const timeout = new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS));
-    if (state.measuring) await Promise.race([device.stopMeasurement(), timeout]);
-  } catch {
-    // Disconnecting ends the stream anyway.
-  }
+  // Do not let a device that no longer answers hold up the disconnect.
+  const withTimeout = (command) =>
+    Promise.race([command, new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS))]).catch(() => {});
+  // Disconnecting ends the stream anyway, so a failed stop does not matter.
+  if (state.measuring) await withTimeout(device.stopMeasurement());
+  // Switches the Progressor off to save its battery; its button wakes it.
+  // It may drop the link itself before answering.
+  await withTimeout(device.sleep());
   state.busy = false;
   device.disconnect();
   render();

@@ -1,6 +1,6 @@
 // Shown in the header; bump together with the others on every change, so a
 // stale cached file shows up as a mismatch.
-export const CHART_BUILD = 21;
+export const CHART_BUILD = 22;
 
 const PAD = { top: 12, right: 20, bottom: 24, left: 44 };
 

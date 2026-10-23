@@ -5,7 +5,7 @@ export { RFD_BUILD };
 
 // Shown in the header; bump together with the others on every change, so a
 // stale cached file shows up as a mismatch.
-export const RFDVIEW_BUILD = 21;
+export const RFDVIEW_BUILD = 22;
 
 const MAX_ATTEMPTS = 20;
 const MIN_CHART_S = 1;
