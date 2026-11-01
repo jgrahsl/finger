@@ -30,11 +30,15 @@ the resting level and at 20 kg/s or faster. Each attempt shows:
 
 The chart marks the onset, the 20 % and 80 % points and the peak with dotted lines.
 
+The **Timer** tab runs get-ready/work/rest intervals. With **Start on pull** switched on (and a
+device connected), each work interval waits at "Pull to start" until the load goes over 5 kg, so
+the work time counts from the actual pull even when a rest ran over.
+
 **Demo** runs the UI against a simulated device.
 
 ## Deploy (home server)
 
-`docker-compose.yml` serves the app through the existing nginx-proxy stack, which provides HTTPS:
+`docker-compose.yml` serves the app through the existing nginx-proxy stack in `l3-public` (`/data/l3-public`), which provides HTTPS:
 
 ```sh
 docker compose up -d                              # serves finger.grahsl.net
@@ -44,6 +48,11 @@ FINGER_HOST=other.example.org docker compose up -d   # or another hostname
 The hostname needs a DNS record pointing at the server before the certificate can be issued.
 Only `public/` is served; it is mounted read-only from this checkout, so edits there are live
 without a restart.
+
+Every push to `main` also publishes `public/` to GitHub Pages at
+<https://jgrahsl.github.io/finger/> (`.github/workflows/pages.yml`, after the tests pass). Pages
+lets browsers cache files for up to 10 minutes; the header shows a version number, or
+"stale files" when cached files from different versions mix.
 
 On an iPad or iPhone, open the page in the [Bluefy](https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055)
 browser: Safari and Chrome on iOS have no Web Bluetooth.

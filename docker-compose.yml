@@ -1,4 +1,4 @@
-# Serves the app behind the nginx-proxy / acme-companion stack in /data/grahsl,
+# Serves the app behind the nginx-proxy / acme-companion stack in /data/l3-public,
 # which terminates HTTPS and obtains the Let's Encrypt certificate.
 services:
   web:

@@ -305,21 +305,15 @@ nav button[aria-selected='true'],
   opacity: 0.4;
 }
 
-/* --load-color is set while a device is connected: the colour of the current load. */
+/* While a device is connected, app.js colours the card by the load. */
 [data-phase='work'] .timer-display {
-  background: var(--load-color, var(--accent));
+  background: var(--accent);
   color: #fff;
 }
 
 [data-phase='rest'] .timer-display {
   background: #000;
   color: #fff;
-}
-
-/* Work has begun but the pull has not: an unmistakable signal colour. */
-[data-phase='work'][data-awaiting-pull]:not([data-load-bg='off']) .timer-display {
-  background: #ffd60a;
-  color: #14171c;
 }
 
 /* Load colouring switched off: fixed, calmer colours per phase. */
@@ -406,6 +400,16 @@ nav button[aria-selected='true'],
 #timer-colors[aria-pressed='false'] {
   opacity: 0.4;
   filter: grayscale(1);
+}
+
+#timer-pull-start {
+  white-space: nowrap;
+}
+
+#timer-pull-start[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
 }
 
 [data-phase='work'] .label,

@@ -2,13 +2,13 @@ import { Progressor } from './progressor.js';
 import { SimulatedProgressor } from './simulator.js';
 import { Chart, CHART_BUILD } from './chart.js';
 import { holdScreen } from './wakelock.js';
-import { timer } from './timer.js';
+import { reportLoad, setLoadSource, timer } from './timer.js';
 import { rfdView, RFDVIEW_BUILD, RFD_BUILD } from './rfdview.js';
 import { BANDS, BELOW_BANDS_COLOR, bandColor } from './bands.js';
 
 // Shown in the header; bump together with the others on every change, so a
 // stale cached file shows up as a mismatch.
-const APP_BUILD = 22;
+const APP_BUILD = 24;
 
 const MIN_Y_MAX_KG = 5;
 const LIVE_WINDOW_S = 30;
@@ -17,6 +17,9 @@ const MIN_FRAME_MS = 50;
 const GAUGE_MAX_KG = 50;
 // A work phase shows a plain signal colour until the pull exceeds this.
 const ENGAGE_KG = 8;
+// Work has begun but the pull has not: an unmistakable signal colour.
+const AWAITING_PULL_COLOR = '#ffd60a';
+const AWAITING_PULL_TEXT = '#14171c';
 const STOP_TIMEOUT_MS = 1000;
 // The sampling rate shown is the number of samples received per this long.
 const RATE_WINDOW_MS = 1000;
@@ -52,6 +55,7 @@ const el = {
   timerForceChip: $('timer-force-chip'),
   bands: $('bands'),
   timerView: $('timer-view'),
+  timerDisplay: document.querySelector('#timer-view .timer-display'),
   gauge: $('timer-gauge'),
   gaugeFill: $('timer-gauge-fill'),
 };
@@ -118,9 +122,14 @@ function frame() {
   el.current.textContent = format(currentKg);
   el.current.style.color = bandColor(currentKg) ?? '';
   el.timerForceChip.style.background = bandColor(currentKg) ?? '';
-  if (state.device) el.timerView.style.setProperty('--load-color', bandColor(currentKg) ?? BELOW_BANDS_COLOR);
-  else el.timerView.style.removeProperty('--load-color');
-  el.timerView.toggleAttribute('data-awaiting-pull', Boolean(state.device) && state.timerPhase === 'work' && !state.engaged);
+  // During work with a device connected the card shows the load: yellow
+  // until the pull has started, then the colour of the current band. Set on
+  // the card itself, like the chip: iOS WebKit did not always repaint it
+  // when the colour came from a custom property on an ancestor.
+  const loadBg = Boolean(state.device) && state.timerPhase === 'work' && el.timerView.dataset.loadBg !== 'off';
+  const awaiting = loadBg && !state.engaged;
+  el.timerDisplay.style.background = !loadBg ? '' : awaiting ? AWAITING_PULL_COLOR : (bandColor(currentKg) ?? BELOW_BANDS_COLOR);
+  el.timerDisplay.style.color = awaiting ? AWAITING_PULL_TEXT : '';
   // The bar shows the colour of the current load, except in a rest: grey.
   const gaugeColor = state.timerPhase === 'rest' ? null : bandColor(currentKg);
   el.gaugeFill.style.background = gaugeColor ?? BELOW_BANDS_COLOR;
@@ -198,6 +207,7 @@ function onSamples(event) {
     if (value > state.peak) state.peak = value;
     if (state.timerPhase === 'work' && value > ENGAGE_KG) state.engaged = true;
     rfdView.push(time / 1e6, value);
+    reportLoad(value);
   }
   invalidate();
 }
@@ -243,6 +253,7 @@ function onDisconnected() {
   clearTimeout(idleTimer);
   clearTimeout(hiddenTimer);
   state.device = null;
+  setLoadSource(false);
   state.measuring = false;
   state.rate = null;
   clearTimeout(watchdog);
@@ -275,6 +286,7 @@ async function connect(device) {
   device.addEventListener('disconnected', onDisconnected);
   device.addEventListener('lowbattery', () => setStatus('Low battery', 'error'));
   state.device = device;
+  setLoadSource(true);
   noteActivity();
   armIdle();
   setStatus('Connected', 'ok');

@@ -22,6 +22,9 @@ const MIN_FLASH_MS = 180;
 const MAX_BEEP_DELAY_MS = 300;
 
 const LABELS = { ready: 'Get ready', work: 'Work', rest: 'Rest' };
+// With "start on pull", work waits for the load to go over this, so the work
+// time is counted from the pull even when the rest ran over.
+const PULL_START_KG = 5;
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -40,6 +43,7 @@ const el = {
   repUp: $('timer-rep-up'),
   mute: $('timer-mute'),
   colors: $('timer-colors'),
+  pullStart: $('timer-pull-start'),
   flash: $('timer-flash'),
 };
 
@@ -55,9 +59,11 @@ let audio = null;
 let muted = false;
 // Whether the card background follows the current load during work.
 let loadColors = true;
+let pullStart = false;
 try {
   muted = localStorage.getItem('muted') === 'true';
   loadColors = localStorage.getItem('loadColors') !== 'false';
+  pullStart = localStorage.getItem('pullStart') === 'true';
 } catch {
   // Defaults to sound on and load colours on.
 }
@@ -69,6 +75,10 @@ let beats = 0; // index of the current beat
 let pausedAt = null; // Date.now() when paused
 // Manual correction of the rep count shown, from the −, 0 and + buttons.
 let repOffset = 0;
+// Whether loads are reported (a device is connected); only then can work wait for a pull.
+let loadSource = false;
+// Held at the first beat of work until the pull starts.
+let waiting = false;
 
 function beep(tone) {
   if (muted || !audio) return;
@@ -127,7 +137,7 @@ function renderMute() {
 function render() {
   const running = state !== null;
   el.view.dataset.phase = running ? state.phase : 'idle';
-  el.phase.textContent = !running ? 'Ready' : pausedAt !== null ? 'Paused' : LABELS[state.phase];
+  el.phase.textContent = !running ? 'Ready' : pausedAt !== null ? 'Paused' : waiting ? 'Pull to start' : LABELS[state.phase];
   el.count.textContent = running ? remaining(state, config) : readConfig().work;
   if (running) el.reps.textContent = Math.max(0, shownRep(state, config) + repOffset);
   el.toggle.textContent = running ? 'Stop' : 'Start';
@@ -170,10 +180,10 @@ function renderProgress() {
     return;
   }
   const beatStart = startedAt + beats * 1000;
-  const now = pausedAt ?? Date.now();
+  const now = waiting ? beatStart : (pausedAt ?? Date.now());
   const into = Math.min(1, Math.max(0, (now - beatStart) / 1000));
   const from = (elapsed + into) / total;
-  if (pausedAt !== null) {
+  if (pausedAt !== null || waiting) {
     progressAt = null;
     setVeil(from);
     return;
@@ -216,9 +226,45 @@ function catchUp() {
   clearTimeout(timeout);
   const due = Math.floor((Date.now() - startedAt) / 1000);
   const skipped = Math.max(1, due - beats);
-  state = advance(state, config, skipped);
-  beats += skipped;
+  for (let i = 0; i < skipped; i++) {
+    state = advance(state, config, 1);
+    beats++;
+    if (shouldWait()) {
+      hold();
+      return;
+    }
+  }
   tick(skipped > 1);
+}
+
+function shouldWait() {
+  return pullStart && loadSource && state.phase === 'work' && state.beat === 0;
+}
+
+// Work is due but the pull has not started: the clock stops until it does.
+function hold() {
+  waiting = true;
+  render();
+  renderProgress();
+  timer.dispatchEvent(new CustomEvent('beat', { detail: state }));
+}
+
+// Starts the held work now, with its start tone.
+function startWork() {
+  waiting = false;
+  startedAt = Date.now() - beats * 1000;
+  tick();
+}
+
+/** The current load in kg, for "start on pull". */
+export function reportLoad(kg) {
+  if (waiting && pausedAt === null && kg > PULL_START_KG) startWork();
+}
+
+/** Whether loads are being reported; without them work never waits. */
+export function setLoadSource(available) {
+  loadSource = available;
+  if (!available && waiting && pausedAt === null) startWork();
 }
 
 function start() {
@@ -233,6 +279,7 @@ function start() {
   startedAt = Date.now();
   beats = 0;
   pausedAt = null;
+  waiting = false;
   repOffset = 0;
   holdScreen('timer', true);
   timer.dispatchEvent(new Event('start'));
@@ -243,6 +290,7 @@ function stop() {
   clearTimeout(timeout);
   state = null;
   pausedAt = null;
+  waiting = false;
   // An open AudioContext keeps the audio hardware powered even when silent.
   audio?.close().catch(() => {});
   audio = null;
@@ -265,9 +313,13 @@ function resume() {
   startedAt += Date.now() - pausedAt;
   pausedAt = null;
   audio?.resume().catch(() => {});
+  if (waiting && !loadSource) {
+    startWork();
+    return;
+  }
   render();
   renderProgress();
-  timeout = setTimeout(catchUp, startedAt + (beats + 1) * 1000 - Date.now());
+  if (!waiting) timeout = setTimeout(catchUp, startedAt + (beats + 1) * 1000 - Date.now());
 }
 
 function adjustReps(change) {
@@ -288,7 +340,7 @@ el.repUp.addEventListener('click', () => state && adjustReps(1));
 // Back on screen: timers may not have run in the meantime, and the audio may
 // have been suspended.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden || !state || pausedAt !== null) return;
+  if (document.hidden || !state || pausedAt !== null || waiting) return;
   if (audio && audio.state !== 'running') audio.resume().catch(() => {});
   if (Date.now() - startedAt >= (beats + 1) * 1000) catchUp();
 });
@@ -318,6 +370,22 @@ el.colors.addEventListener('click', () => {
   renderColors();
 });
 renderColors();
+
+function renderPullStart() {
+  el.pullStart.setAttribute('aria-pressed', pullStart);
+}
+el.pullStart.addEventListener('click', () => {
+  pullStart = !pullStart;
+  try {
+    localStorage.setItem('pullStart', pullStart);
+  } catch {
+    // Still applies for this visit.
+  }
+  renderPullStart();
+  // Switched off while held: the work starts now.
+  if (!pullStart && waiting && pausedAt === null) startWork();
+});
+renderPullStart();
 
 for (const preset of el.presets) {
   preset.addEventListener('click', () => {
